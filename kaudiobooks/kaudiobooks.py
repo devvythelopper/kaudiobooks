@@ -10,6 +10,7 @@ from datetime import datetime
 from audible_cli.models import Library
 from audible_cli.config import Session
 import logging
+import concurrent
 
 log = logging.getLogger(__name__)
 
@@ -17,16 +18,21 @@ def ensure_audible_dir(args):
    if args.audible_dir is None:
       raise ValueError("either --audible-dir or KAUDIOBOOKS_AUDIBLE_DIR must be set")
 
-def download(args):
-  ensure_audible_dir(args)
+def make_date_args(args):
+   
   start = ""
   end = ""
   if args.start_date is not None:
-    start = f"--start-date {args.start_date}"
+    start = f'--start-date "{args.start_date}"'
   if args.end_date is not None:
-    end = f"--end-date {args.start_end}"
+    end = f'--end-date "{args.start_end}"'
+  return f' {start} {end}'
 
-  subprocess.run(f"audible download --output-dir '{args.audible_dir}' --pdf --cover --annotation --chapter --chapter-type Flat --quality best --aaxc --all {start} {end}", shell=True)
+def download(args):
+  ensure_audible_dir(args)
+  date_args = make_date_args(args)
+  
+  subprocess.run(f"audible download --output-dir '{args.audible_dir}' --pdf --cover --annotation --chapter --chapter-type Flat --quality best --aaxc --all {date_args}", shell=True)
 
 
 def convert(args):
@@ -36,11 +42,43 @@ async def do_convert(args):
   ensure_audible_dir(args)
   log.info("loading library")
   lib = await Library.from_api(Session().get_client(), start_date = args.start_date, end_date= args.end_date)
-  log.info("loaded library")
+  log.info("items to convert:")
   for item in lib:
-    base_filename = item.create_base_filename("unicode")
-    log.info(f"converting: {base_filename}")
+     log.info(f"{item.create_base_filename("ascii")}")
+  log.info("starting conversion")
 
+  def execute_wrapper(args):
+     execute_conversion(*args)
+
+  def execute_conversion(index, item):
+    base_filename = item.create_base_filename("ascii")  
+    try:
+      _, aaxcodec = asyncio.run(item.get_aax_url_old("best"))
+    except:
+      aaxcodec = ""
+    aaxccodec, _ = item._get_codec("best")
+    log.info(f"converting {index}: {base_filename}")
+
+    aaxcpath = f"{args.audible_dir}/{base_filename}-{aaxcodec}.aax"
+    aaxpath = f"{args.audible_dir}/{base_filename}-{aaxccodec}.aaxc"
+    if os.path.isfile(aaxcpath):
+      path = aaxcpath
+    elif os.path.isfile(aaxpath):
+      path = aaxpath
+    else:
+       raise ValueError(f"audiobook `{path}` does not exist. Download it first.")
+
+    subprocess.run(["aaxtomp3", "--dir-naming-scheme", "$title - $artist", path])
+    # subprocess.run("echo sleeping; sleep 1; echo done;", shell=True)
+    log.info(f"conversion {index} finished: {base_filename}")
+
+  with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+    results = list(executor.map(execute_wrapper, enumerate(lib)))
+
+
+
+
+   
 
 
 def run_command():
@@ -72,6 +110,7 @@ def run_command():
 
 
   convert_parser = subparser.add_parser('convert', parents=[shared_parser, dated_parser], help= 'converts audiobooks')
+  convert_parser.add_argument("--jobs", type=int, help="the number of jobs", default=2)
 
 
   convert_parser.set_defaults(func=convert)
