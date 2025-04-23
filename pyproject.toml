@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "kaudiobooks"
+version = "0.1.0"
+description = ""
+authors = ["Devvythelopper"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+kpyutils = "^0.1.0"
+
+[tool.poetry.dev-dependencies]               
+kpyutils = { path = "../kpyutils", develop = true }
+audible_cli = { path = "../audible-cli", develop = true }
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
