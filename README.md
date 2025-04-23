@@ -1,8 +1,3 @@
-A small python script that runs audible-cli and aaxtomp3 with the arguments I need to manage my audiobook library.
-
-When converting multiple audiobooks allows you to specify the number of processes.
-
-
 ```
 usage: __main__.py [-h] {purge,download,convert,tag-to-name,name-to-tag,tag-to-dirname,dirname-to-tag,sanitize-dirnames,overwrite-title-from-track} ...
 
