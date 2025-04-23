@@ -59,14 +59,14 @@ async def do_convert(args):
     aaxccodec, _ = item._get_codec("best")
     log.info(f"converting {index}: {base_filename}")
 
-    aaxcpath = f"{args.audible_dir}/{base_filename}-{aaxcodec}.aax"
-    aaxpath = f"{args.audible_dir}/{base_filename}-{aaxccodec}.aaxc"
+    aaxcpath = f"{args.audible_dir}/{base_filename}-{aaxccodec}.aax"
+    aaxpath = f"{args.audible_dir}/{base_filename}-{aaxcodec}.aaxc"
     if os.path.isfile(aaxcpath):
       path = aaxcpath
     elif os.path.isfile(aaxpath):
       path = aaxpath
     else:
-       raise ValueError(f"audiobook `{path}` does not exist. Download it first.")
+       raise ValueError(f"audiobook `{base_filename}` does not exist. Download it first.")
 
     subprocess.run(["aaxtomp3", "--dir-naming-scheme", "$title - $artist", path])
     # subprocess.run("echo sleeping; sleep 1; echo done;", shell=True)
