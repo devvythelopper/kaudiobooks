@@ -8,6 +8,8 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 kpyutils = "^0.1.0"
+natsort = "^8.4.0"
+eyed3 = "^0.9.7"
 
 [tool.poetry.dev-dependencies]               
 kpyutils = { path = "../kpyutils", develop = true }
