@@ -510,7 +510,9 @@ def run_command():
     ]
   )
 
-  parser = argparse.ArgumentParser(description="audiobooks manager")
+  parser = argparse.ArgumentParser(description=
+'''audiobooks manager. The directory structure used/applied by this software is `title -- author/title -- lpadded_track_num -- chapter title`. All problematic characters in title, author and chapter will be converted into lookalike characters from the unicode character set when applied to the filename. All tag or filename changes are presented to the user beforehand and require manual confirmation.
+''')
   subparser = parser.add_subparsers(required=True)
 
 
@@ -523,7 +525,7 @@ def run_command():
 
   
 
-  purge_parser = subparser.add_parser('purge', parents=[global_parser], help= 'purges all non-audiobook files (non mp3s) from audiobook directories. This gets rid of m3u and cover.jpg for example. Will only delete files from directories that actually contain audiobook files (mp3 files)')
+  purge_parser = subparser.add_parser('purge', parents=[global_parser], help= 'purges .jpg and .m3u from audiobook directories. This gets rid of m3u and cover.jpg for example. Will only delete files from directories that actually contain audiobook files (mp3 files)')
   purge_parser.add_argument("--root", type=str, help="the directory under which the files lay (or just a single file)", default=None)
   purge_parser.set_defaults(func=purge)
 
@@ -541,7 +543,7 @@ def run_command():
   download_parser.set_defaults(func=download)
 
 
-  convert_parser = subparser.add_parser('convert', parents=[audible_parser, dated_parser], help= 'converts audiobooks')
+  convert_parser = subparser.add_parser('convert', parents=[audible_parser, dated_parser], help= 'converts audiobooks from aac or aacx to mp3s using aaxtomp3 (this will not apply the directory structure used by kaudiobooks. You then manually check/change the id3 tags (with kid3 for example) and use kaudiobooks to apply various mass operations.)')
   convert_parser.add_argument("--jobs", type=int, help="the number of jobs", default=2)
 
 
