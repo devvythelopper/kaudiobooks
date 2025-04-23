@@ -89,7 +89,7 @@ def show_string_diff(str1, str2):
 
 
 
-filename_pattern = r"^(.+) -- (\d+) -- (.+)\.mp3$"
+filename_pattern = r"^(?P<book>.+) -- (?P<track>\d+) -- (?P<chapter>.+)\.mp3$"
 dir_pattern = r"^(.+) -- (.+)$"
 
 
@@ -138,23 +138,33 @@ def name_to_tag(args):
     log.debug(f"digits: {digits}")
     index = 0
 
+    album_path = album_path.rstrip("/")
+
 
     def handle_chapter(child):
       path = f"{album_path}/{child}"
       nonlocal index
       index += 1
-      log.debug(f"handling chapter: {path}")
+      log.debug(f"handling chapter ({index}): {path}")
         
       name = os.path.basename(path)
 
 
-      match = re.match(filename_pattern, name)
-      if match:
-        album = match.group(1)
-        track = match.group(2)
-        title = match.group(3)
 
-        audiofile = eyed3.load(path)
+      match = re.match(args.pattern, name)
+      if match:
+        try:
+          album = match.group("book")
+        except:
+          album = None
+        try:
+          track = match.group("track")
+        except:
+          track = None
+        try:
+          title = match.group("chapter")
+        except:
+          title = None
 
 
 
@@ -165,18 +175,28 @@ def name_to_tag(args):
         
 
         if args.renumber:
-          if tag.track_num[0] != index or tag.track_num[1] != num_files:
-
-            log.info(f"`{child}`: updating track number to: {index}/{num_files}")
-            tag.track_num = (index, num_files)
+          if tag.track_num[1] != num_files:
+            tag.track_num = (tag.track_num[0], num_files)
+            log.info(f"`{child}`: updating track total: {num_files}")
+            change = True
+          if tag.track_num[0] != index:
+            log.info(f"`{child}`: updating track number to: {index}")
+            tag.track_num = (index, tag.track_num[1])
+            change = True
+        elif track is not None:
+            tracknum = int(track)
+            log.info(f"`{child}`: updating track number to: {tracknum}")
+            tag.track_num = (tracknum, tag.track_num[1])
             change = True
 
-        if tag.title != unsanitize_filename(title):
+
+
+        if title is not None and tag.title != unsanitize_filename(title):
           log.info(f"`{child}`: updating title: `{tag.title}`\n--> `{title}`")
           tag.title = unsanitize_filename(title)
           change = True
 
-        if tag.album != unsanitize_filename(album):
+        if album is not None and tag.album != unsanitize_filename(album):
           log.info(f"`{child}`: updating album: `{tag.album}`\n--> `{album}`")
           tag.album = unsanitize_filename(album)
           change = True
@@ -185,6 +205,8 @@ def name_to_tag(args):
           tag.save()
         if change:
           return commit
+      else:
+        log.info("filename does not match pattern")
       
     return list(map(handle_chapter, files))
   changes = map_file_tree(args.root, handle_branch=handle_album)
@@ -209,8 +231,11 @@ def tag_to_dirname(args):
       new_name = sanitize_filename(f"{tag.album} -- {tag.artist}")
       if old_name != new_name:
         log.info(f"renaming directory: `{album_path}` --> {new_name}")
+        new_path = f"{os.path.dirname(old_name)}/{new_name}"
+        if os.path.exists(new_path):
+          raise ValueError(f"path already exists: {new_path}")
         def rename():
-          os.rename(album_path, f"{os.path.dirname(old_name)}/{new_name}")
+          os.rename(album_path, new_path)
         return rename
 
   changes = map_file_tree(args.root, handle_branch=handle_album)
@@ -556,6 +581,7 @@ def run_command():
   name_to_tag_parser = subparser.add_parser('name-to-tag', parents=[global_parser], help= 'updates id3 tag v2 from filename (according to kaudiobooks own filename pattern)')
   name_to_tag_parser.add_argument("--root", type=str, help="the directory under which the files lay (or just a single file)", default=None)
   name_to_tag_parser.add_argument("--renumber", action='store_true', help="whether the track number should be updated according to sort order of the original files in the directory")
+  name_to_tag_parser.add_argument("--pattern", type=str, help='''the regex pattern to apply to the filename. The named groups `book`, `track` and `chapter` will be used if present.''', default=filename_pattern)
   name_to_tag_parser.set_defaults(func=name_to_tag)
 
 
@@ -567,6 +593,7 @@ def run_command():
   dirname_to_tag_parser.add_argument("--rename", action='store_true', help="whether to also rename the chapter files if the tag changed")
   dirname_to_tag_parser.add_argument("--renumber", action='store_true', help="whether the track number should be updated according to sort order of the original files in the directory")
   dirname_to_tag_parser.add_argument("--root", type=str, help="the directory under which the audiobook directories lay (or just a single directories)", default=None)
+  dirname_to_tag_parser.set_defaults(func=dirname_to_tag)
 
 
   sanitize_dir_names_parser = subparser.add_parser('sanitize-dirnames', parents=[global_parser], help= 'renames audiobook directories replacing problematic characters with unicode lookalikes (ignores directories that don\'t contain audiobook chapters [mp3 files])')
@@ -581,7 +608,6 @@ def run_command():
   overwrite_title_from_track_parser.set_defaults(func=overwrite_title_from_track)
 
 
-  dirname_to_tag_parser.set_defaults(func=dirname_to_tag)
 
   convert_parser.set_defaults(func=convert)
 
@@ -589,10 +615,9 @@ def run_command():
   
   args = parser.parse_args()
 
+  logging.getLogger("eyed3").setLevel(logging.CRITICAL)
   if args.verbose:
     logging.getLogger().setLevel(logging.DEBUG)
-  else:
-    logging.getLogger("eyed3.mp3.headers").setLevel(logging.CRITICAL)
 
   args.func(args)
 
